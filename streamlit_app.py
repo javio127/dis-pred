@@ -1,8 +1,12 @@
+import os
 import streamlit as st
 import joblib
 import numpy as np
 from io import BytesIO
 from transformers import T5Tokenizer, T5ForConditionalGeneration
+
+# 🚀 Ensure necessary dependencies are installed
+os.system("pip install torch sentencepiece protobuf --quiet")
 
 st.title("🌎 Catastrophe Prediction & Risk Insights")
 
@@ -43,20 +47,29 @@ if xgb_file and rf_fatalities_file and rf_economic_file:
         fatalities = rf_fatalities.predict(X_input)[0]
         economic_loss = rf_economic.predict(X_input)[0]
 
+        # Format output values for readability
+        formatted_fatalities = f"{int(fatalities):,}" if fatalities > 0 else "Minimal impact"
+        formatted_economic_loss = f"${economic_loss:.2f} billion"
+
         st.subheader("🌪️ Predicted Future Catastrophe")
         st.write(f"📆 **Date:** {selected_date}")
         st.write(f"🌪️ **Disaster Type:** {predicted_disaster}")
         st.write(f"📊 **Probability:** {probability:.2f}")
-        st.write(f"💀 **Fatalities:** {int(fatalities):,} deaths")
-        st.write(f"💰 **Economic Loss:** ${economic_loss:.2f} billion")
+        st.write(f"💀 **Fatalities:** {formatted_fatalities}")
+        st.write(f"💰 **Economic Loss:** {formatted_economic_loss}")
 
         # Generate LLM insight
         with st.spinner("🧠 Thinking of novel risks..."):
             prompt = (f"A {predicted_disaster} is predicted with a probability of {probability:.2f}. "
-                      f"It is estimated to cause {int(fatalities):,} deaths and ${economic_loss:.2f} billion in economic loss. "
+                      f"It is estimated to cause {formatted_fatalities} fatalities and {formatted_economic_loss} in economic loss. "
                       "What are some underappreciated risks or consequences of this disaster?")
+            
             inputs = tokenizer(prompt, return_tensors="pt")
             output = model.generate(**inputs, max_length=50)
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
+
+            # Fix Formatting
+            formatted_insight = insight.replace(".", ". ").replace("  ", " ")
+
             st.subheader("🧠 Novel Risk Insight")
-            st.write(insight)
+            st.write(formatted_insight)
