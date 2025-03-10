@@ -5,3 +5,5 @@ pandas
 transformers
 scikit-learn
 xgboost
+torch
+sentencepiece
