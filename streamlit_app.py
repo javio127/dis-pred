@@ -17,6 +17,11 @@ if data_file:
     df = pd.read_csv(data_file)
     st.sidebar.success("✅ Dataset uploaded successfully!")
 
+    # Dynamically extract feature set from dataset (excluding target variable)
+    FEATURE_SET = list(df.drop(columns=["Fatalities"]).columns)  # Ensure all features match the model
+else:
+    FEATURE_SET = []
+
 # Load trained ML model if uploaded
 if rf_severity_file:
     rf_severity = joblib.load(BytesIO(rf_severity_file.read()))
@@ -31,10 +36,6 @@ def load_llm():
     return tokenizer, model
 
 tokenizer, model = load_llm()
-
-# Dynamically extract feature set from dataset (excluding target variable)
-if data_file:
-    FEATURE_SET = list(df.drop(columns=["Fatalities"]).columns)  # Ensure all features match the model
 
 # Function to get most frequent disaster type for a location & month
 def get_most_frequent_disaster(location, month):
@@ -101,4 +102,3 @@ if data_file:
             st.subheader("🧠 Novel Risk Insight")
             st.write(insight)
 
-            st.write(insight)
