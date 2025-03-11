@@ -67,10 +67,13 @@ if data_file:
     if rf_severity_file:
         X_input = pd.DataFrame([[month, day, probability]],
                                columns=["Month", "Day", "Probability"])
+        
+        # Ensure "Location" and "Disaster_Type" are included before encoding
+        X_input["Location"] = selected_location
+        X_input["Disaster_Type"] = predicted_disaster
 
-        # Convert categorical variables (one-hot encoding)
-        if "Location" in df.columns and "Disaster_Type" in df.columns:
-            X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
+        # Apply one-hot encoding only if categorical columns exist
+        X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
 
         # Ensure X_input has the same columns as the trained model
         for col in FEATURE_SET:
