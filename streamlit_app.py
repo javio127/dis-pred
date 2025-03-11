@@ -9,18 +9,20 @@ st.title("🌎 Catastrophe Prediction & Risk Insights")
 
 # Upload processed dataset
 st.sidebar.header("📂 Upload Files")
-data_file = st.sidebar.file_uploader("📂 Upload Processed Disaster Data (CSV)", type=["csv"])
-rf_severity_file = st.sidebar.file_uploader("📂 Upload Severity Prediction Model (PKL)", type=["pkl"])
+data_file = st.sidebar.file_uploader("Upload Processed Disaster Data (CSV)", type=["csv"])
+rf_severity_file = st.sidebar.file_uploader("Upload Severity Prediction Model (PKL)", type=["pkl"])
+feature_names_file = st.sidebar.file_uploader("Upload Model Feature Names (PKL)", type=["pkl"])
 
 # Load dataset if uploaded
 if data_file:
     df = pd.read_csv(data_file)
     st.sidebar.success("✅ Dataset uploaded successfully!")
 
-# Load trained ML model if uploaded
-if rf_severity_file:
+# Load trained ML model and feature names if uploaded
+if rf_severity_file and feature_names_file:
     rf_severity = joblib.load(BytesIO(rf_severity_file.read()))
-    st.sidebar.success("✅ ML Model Uploaded Successfully!")
+    model_features = joblib.load(BytesIO(feature_names_file.read()))
+    st.sidebar.success("✅ ML Model & Features Uploaded Successfully!")
 
 # Load LLM for novel risk insights
 @st.cache_resource
@@ -57,20 +59,25 @@ if data_file:
     probability = compute_probability(selected_location, month)
 
     # Prepare input for ML model (if uploaded)
-    if rf_severity_file:
+    if rf_severity_file and feature_names_file:
         X_input = pd.DataFrame([[month, day, selected_location, predicted_disaster, probability]],
                                columns=["Month", "Day", "Location", "Disaster_Type", "Probability"])
+
+        # Convert categorical variables (one-hot encoding)
         X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
 
-        # Ensure all feature columns exist
-        for col in df.columns:
-            if col not in X_input.columns and col not in ["Fatalities", "Economic_Loss($)"]:
-                X_input[col] = 0  # Add missing columns with default 0
+        # Ensure X_input has the same columns as the model
+        for col in model_features:
+            if col not in X_input.columns:
+                X_input[col] = 0  # Add missing columns with 0
+
+        # Reorder columns to match the trained model
+        X_input = X_input[model_features]
 
         # Predict severity (fatalities)
         severity = rf_severity.predict(X_input)[0]
     else:
-        severity = "⚠️ Upload ML model to see severity."
+        severity = "⚠️ Upload ML model & feature names to see severity."
 
     # Display results
     st.subheader("🌪️ Predicted Future Catastrophe")
@@ -91,5 +98,4 @@ if data_file:
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
             st.subheader("🧠 Novel Risk Insight")
             st.write(insight)
-
             st.write(insight)
