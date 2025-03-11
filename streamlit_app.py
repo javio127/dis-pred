@@ -32,8 +32,8 @@ def load_llm():
 
 tokenizer, model = load_llm()
 
-# Hardcoded feature names (from training)
-HARD_CODED_FEATURES = [
+# Feature set used during model training
+FEATURE_SET = [
     "Month", "Day", "Probability",  # Base features
     "Location_India", "Location_Japan", "Location_USA",  # Example one-hot encoded locations
     "Disaster_Type_Flood", "Disaster_Type_Hurricane", "Disaster_Type_Tornado"  # Example disaster types
@@ -69,15 +69,16 @@ if data_file:
                                columns=["Month", "Day", "Probability"])
 
         # Convert categorical variables (one-hot encoding)
-        X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
+        if "Location" in df.columns and "Disaster_Type" in df.columns:
+            X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
 
-        # Ensure X_input has the same columns as the model
-        for col in HARD_CODED_FEATURES:
+        # Ensure X_input has the same columns as the trained model
+        for col in FEATURE_SET:
             if col not in X_input.columns:
                 X_input[col] = 0  # Add missing columns with 0
 
         # Reorder columns to match the trained model
-        X_input = X_input[HARD_CODED_FEATURES]
+        X_input = X_input[FEATURE_SET]
 
         # Predict severity (fatalities)
         severity = rf_severity.predict(X_input)[0]
@@ -102,6 +103,4 @@ if data_file:
             output = model.generate(**inputs, max_length=50)
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
             st.subheader("🧠 Novel Risk Insight")
-            st.write(insight)
-
             st.write(insight)
