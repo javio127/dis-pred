@@ -9,20 +9,18 @@ st.title("🌎 Catastrophe Prediction & Risk Insights")
 
 # Upload processed dataset
 st.sidebar.header("📂 Upload Files")
-data_file = st.sidebar.file_uploader("Upload Processed Disaster Data (CSV)", type=["csv"])
-rf_severity_file = st.sidebar.file_uploader("Upload Severity Prediction Model (PKL)", type=["pkl"])
-feature_names_file = st.sidebar.file_uploader("Upload Model Feature Names (PKL)", type=["pkl"])
+data_file = st.sidebar.file_uploader("📂 Upload Processed Disaster Data (CSV)", type=["csv"])
+rf_severity_file = st.sidebar.file_uploader("📂 Upload Severity Prediction Model (PKL)", type=["pkl"])
 
 # Load dataset if uploaded
 if data_file:
     df = pd.read_csv(data_file)
     st.sidebar.success("✅ Dataset uploaded successfully!")
 
-# Load trained ML model and feature names if uploaded
-if rf_severity_file and feature_names_file:
+# Load trained ML model if uploaded
+if rf_severity_file:
     rf_severity = joblib.load(BytesIO(rf_severity_file.read()))
-    model_features = joblib.load(BytesIO(feature_names_file.read()))
-    st.sidebar.success("✅ ML Model & Features Uploaded Successfully!")
+    st.sidebar.success("✅ ML Model Uploaded Successfully!")
 
 # Load LLM for novel risk insights
 @st.cache_resource
@@ -33,6 +31,13 @@ def load_llm():
     return tokenizer, model
 
 tokenizer, model = load_llm()
+
+# Hardcoded feature names (from training)
+HARD_CODED_FEATURES = [
+    "Month", "Day", "Probability",  # Base features
+    "Location_India", "Location_Japan", "Location_USA",  # Example one-hot encoded locations
+    "Disaster_Type_Flood", "Disaster_Type_Hurricane", "Disaster_Type_Tornado"  # Example disaster types
+]
 
 # Function to get most frequent disaster type for a location & month
 def get_most_frequent_disaster(location, month):
@@ -59,25 +64,25 @@ if data_file:
     probability = compute_probability(selected_location, month)
 
     # Prepare input for ML model (if uploaded)
-    if rf_severity_file and feature_names_file:
-        X_input = pd.DataFrame([[month, day, selected_location, predicted_disaster, probability]],
-                               columns=["Month", "Day", "Location", "Disaster_Type", "Probability"])
+    if rf_severity_file:
+        X_input = pd.DataFrame([[month, day, probability]],
+                               columns=["Month", "Day", "Probability"])
 
         # Convert categorical variables (one-hot encoding)
         X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
 
         # Ensure X_input has the same columns as the model
-        for col in model_features:
+        for col in HARD_CODED_FEATURES:
             if col not in X_input.columns:
                 X_input[col] = 0  # Add missing columns with 0
 
         # Reorder columns to match the trained model
-        X_input = X_input[model_features]
+        X_input = X_input[HARD_CODED_FEATURES]
 
         # Predict severity (fatalities)
         severity = rf_severity.predict(X_input)[0]
     else:
-        severity = "⚠️ Upload ML model & feature names to see severity."
+        severity = "⚠️ Upload ML model to see severity."
 
     # Display results
     st.subheader("🌪️ Predicted Future Catastrophe")
@@ -98,4 +103,5 @@ if data_file:
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
             st.subheader("🧠 Novel Risk Insight")
             st.write(insight)
+
             st.write(insight)
