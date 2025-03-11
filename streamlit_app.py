@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import joblib
 import numpy as np
+import pandas as pd
 from io import BytesIO
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
@@ -24,21 +25,27 @@ if xgb_file and rf_fatalities_file and rf_economic_file:
     rf_fatalities = joblib.load(BytesIO(rf_fatalities_file.read()))
     rf_economic = joblib.load(BytesIO(rf_economic_file.read()))
 
-    # Load LLM model for risk insights
-    model_name = "t5-base"
-    tokenizer = T5Tokenizer.from_pretrained(model_name)
-    model = T5ForConditionalGeneration.from_pretrained(model_name)
+    # Load the processed dataset to get location options
+    df = pd.read_csv("processed_disaster_data.csv")
+    unique_locations = sorted(df["Location"].unique())  # Get unique locations
 
-    # Disaster mapping
-    disaster_mapping = {0: "Earthquake", 1: "Flood", 2: "Hurricane", 3: "Wildfire", 4: "Tornado"}
+    # Create a mapping for location encoding
+    location_mapping = {i: loc for i, loc in enumerate(unique_locations)}
 
     # User selects a date
     selected_date = st.date_input("📅 Select a Date")
     year, month, day = selected_date.year, selected_date.month, selected_date.day
 
+    # User selects a location
+    selected_location = st.selectbox("📍 Select a Location", options=list(location_mapping.values()))
+    encoded_location = [k for k, v in location_mapping.items() if v == selected_location][0]  # Convert back to numeric
+
+    # Disaster mapping
+    disaster_mapping = {0: "Earthquake", 1: "Flood", 2: "Hurricane", 3: "Wildfire", 4: "Tornado"}
+
     # Predict button
     if st.button("🔮 Predict Catastrophe"):
-        X_input = np.array([[year, month, day]])  # Only using the date now
+        X_input = np.array([[year, month, day, encoded_location]])  # Using date & location only
         disaster_probs = xgb_model.predict_proba(X_input)
         max_prob_index = np.argmax(disaster_probs)
         predicted_disaster = disaster_mapping[max_prob_index]
@@ -52,6 +59,7 @@ if xgb_file and rf_fatalities_file and rf_economic_file:
 
         st.subheader("🌪️ Predicted Future Catastrophe")
         st.write(f"📆 **Date:** {selected_date}")
+        st.write(f"🌍 **Location:** {selected_location}")
         st.write(f"🌪️ **Disaster Type:** {predicted_disaster}")
         st.write(f"📊 **Probability:** {probability:.2f}")
         st.write(f"💀 **Fatalities:** {formatted_fatalities}")
@@ -62,6 +70,9 @@ if xgb_file and rf_fatalities_file and rf_economic_file:
             prompt = (f"A {predicted_disaster} is predicted with a probability of {probability:.2f}. "
                       f"It is estimated to cause {formatted_fatalities} fatalities and {formatted_economic_loss} in economic loss. "
                       "What are some underappreciated risks or consequences of this disaster?")
+            
+            tokenizer = T5Tokenizer.from_pretrained("t5-base")
+            model = T5ForConditionalGeneration.from_pretrained("t5-base")
             
             inputs = tokenizer(prompt, return_tensors="pt")
             output = model.generate(**inputs, max_length=50)
