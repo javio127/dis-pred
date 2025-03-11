@@ -8,52 +8,55 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration
 st.title("🌎 Catastrophe Prediction & Risk Insights")
 
 # Upload processed dataset
-st.sidebar.header("📂 Upload Processed Disaster Data")
-data_file = st.sidebar.file_uploader("Upload processed disaster data", type=["csv"])
+st.sidebar.header("📂 Upload Files")
+data_file = st.sidebar.file_uploader("📂 Upload Processed Disaster Data (CSV)", type=["csv"])
+rf_severity_file = st.sidebar.file_uploader("📂 Upload Severity Prediction Model (PKL)", type=["pkl"])
 
+# Load dataset if uploaded
 if data_file:
     df = pd.read_csv(data_file)
     st.sidebar.success("✅ Dataset uploaded successfully!")
 
-    # Upload trained severity model
-    rf_severity_file = st.sidebar.file_uploader("📂 Upload Severity Model", type=["pkl"])
+# Load trained ML model if uploaded
+if rf_severity_file:
+    rf_severity = joblib.load(BytesIO(rf_severity_file.read()))
+    st.sidebar.success("✅ ML Model Uploaded Successfully!")
 
-    if rf_severity_file:
-        rf_severity = joblib.load(BytesIO(rf_severity_file.read()))
-        st.sidebar.success("✅ ML Model Uploaded Successfully!")
+# Load LLM for novel risk insights
+@st.cache_resource
+def load_llm():
+    model_name = "t5-base"
+    tokenizer = T5Tokenizer.from_pretrained(model_name)
+    model = T5ForConditionalGeneration.from_pretrained(model_name)
+    return tokenizer, model
 
-    # Load LLM for novel risk insights
-    @st.cache_resource
-    def load_llm():
-        model_name = "t5-base"
-        tokenizer = T5Tokenizer.from_pretrained(model_name)
-        model = T5ForConditionalGeneration.from_pretrained(model_name)
-        return tokenizer, model
+tokenizer, model = load_llm()
 
-    tokenizer, model = load_llm()
+# Function to get most frequent disaster type for a location & month
+def get_most_frequent_disaster(location, month):
+    subset = df[(df["Location"] == location) & (df["Month"] == month)]
+    if not subset.empty:
+        return subset["Disaster_Type"].mode()[0]  # Most frequent disaster type
+    return "Unknown"
 
-    # Function to get most frequent disaster type for a location & month
-    def get_most_frequent_disaster(location, month):
-        subset = df[(df["Location"] == location) & (df["Month"] == month)]
-        if not subset.empty:
-            return subset["Disaster_Type"].mode()[0]  # Most frequent disaster type
-        return "Unknown"
+# Function to compute disaster probability
+def compute_probability(location, month):
+    subset = df[(df["Location"] == location) & (df["Month"] == month)]
+    return len(subset) / len(df)  # Normalize between 0-1
 
-    # Function to compute disaster probability
-    def compute_probability(location, month):
-        subset = df[(df["Location"] == location) & (df["Month"] == month)]
-        return len(subset) / len(df)  # Normalize between 0-1
-
-    # User selects date & location
-    selected_date = st.date_input("📅 Select a Date")
+# User selects date & location
+selected_date = st.date_input("📅 Select a Date")
+if data_file:
     selected_location = st.selectbox("🌍 Select a Location", df["Location"].unique())
 
-    # Extract month and find disaster type & probability
+    # Extract month and day
     month, day = selected_date.month, selected_date.day
+
+    # Predict disaster type and probability
     predicted_disaster = get_most_frequent_disaster(selected_location, month)
     probability = compute_probability(selected_location, month)
 
-    # Prepare input for ML model
+    # Prepare input for ML model (if uploaded)
     if rf_severity_file:
         X_input = pd.DataFrame([[month, day, selected_location, predicted_disaster, probability]],
                                columns=["Month", "Day", "Location", "Disaster_Type", "Probability"])
@@ -87,4 +90,6 @@ if data_file:
             output = model.generate(**inputs, max_length=50)
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
             st.subheader("🧠 Novel Risk Insight")
+            st.write(insight)
+
             st.write(insight)
