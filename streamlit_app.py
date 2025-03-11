@@ -35,11 +35,10 @@ if xgb_file and rf_fatalities_file and rf_economic_file:
     # User selects a date
     selected_date = st.date_input("📅 Select a Date")
     year, month, day = selected_date.year, selected_date.month, selected_date.day
-    magnitude = st.slider("🌋 Disaster Magnitude (1-10)", min_value=1.0, max_value=10.0, step=0.1)
 
     # Predict button
     if st.button("🔮 Predict Catastrophe"):
-        X_input = np.array([[year, month, day, magnitude, 0]])  # Dummy location ID
+        X_input = np.array([[year, month, day]])  # Only using the date now
         disaster_probs = xgb_model.predict_proba(X_input)
         max_prob_index = np.argmax(disaster_probs)
         predicted_disaster = disaster_mapping[max_prob_index]
