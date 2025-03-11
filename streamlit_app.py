@@ -32,12 +32,9 @@ def load_llm():
 
 tokenizer, model = load_llm()
 
-# Feature set used during model training
-FEATURE_SET = [
-    "Month", "Day", "Probability",  # Base features
-    "Location_India", "Location_Japan", "Location_USA",  # Example one-hot encoded locations
-    "Disaster_Type_Flood", "Disaster_Type_Hurricane", "Disaster_Type_Tornado"  # Example disaster types
-]
+# Dynamically extract feature set from dataset (excluding target variable)
+if data_file:
+    FEATURE_SET = list(df.drop(columns=["Fatalities"]).columns)  # Ensure all features match the model
 
 # Function to get most frequent disaster type for a location & month
 def get_most_frequent_disaster(location, month):
@@ -65,22 +62,18 @@ if data_file:
 
     # Prepare input for ML model (if uploaded)
     if rf_severity_file:
-        X_input = pd.DataFrame([[month, day, probability]],
-                               columns=["Month", "Day", "Probability"])
-        
-        # Ensure "Location" and "Disaster_Type" are included before encoding
-        X_input["Location"] = selected_location
-        X_input["Disaster_Type"] = predicted_disaster
+        X_input = pd.DataFrame([[month, day, probability, selected_location, predicted_disaster]],
+                               columns=["Month", "Day", "Probability", "Location", "Disaster_Type"])
 
-        # Apply one-hot encoding only if categorical columns exist
-        X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"], drop_first=True)
+        # One-hot encode categorical variables
+        X_input = pd.get_dummies(X_input, columns=["Location", "Disaster_Type"])
 
         # Ensure X_input has the same columns as the trained model
         for col in FEATURE_SET:
             if col not in X_input.columns:
                 X_input[col] = 0  # Add missing columns with 0
 
-        # Reorder columns to match the trained model
+        # Align X_input columns with model expectations
         X_input = X_input[FEATURE_SET]
 
         # Predict severity (fatalities)
@@ -106,4 +99,6 @@ if data_file:
             output = model.generate(**inputs, max_length=50)
             insight = tokenizer.decode(output[0], skip_special_tokens=True)
             st.subheader("🧠 Novel Risk Insight")
+            st.write(insight)
+
             st.write(insight)
